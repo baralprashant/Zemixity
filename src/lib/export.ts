@@ -1,0 +1,225 @@
+/**
+ * Export conversation to HTML format
+ */
+export async function exportConversationAsHTML(threadId: string, threadTitle: string) {
+  try {
+    // Fetch thread data
+    const response = await fetch(`/api/threads/${threadId}`);
+    if (!response.ok) throw new Error('Failed to fetch thread');
+    const thread = await response.json();
+
+    // Build HTML content
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHTML(threadTitle)}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background: #f9fafb;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            font-size: 2rem;
+            color: #111827;
+            margin-bottom: 0.5rem;
+        }
+        .metadata {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        .message {
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .message:last-child {
+            border-bottom: none;
+        }
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: white;
+        }
+        .avatar-user {
+            background: linear-gradient(135deg, #93C572, #7AB055);
+        }
+        .avatar-assistant {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        }
+        .role {
+            font-weight: 600;
+            color: #374151;
+        }
+        .content {
+            color: #374151;
+            white-space: pre-wrap;
+        }
+        .sources {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #f3f4f6;
+        }
+        .sources-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+        .source-link {
+            display: block;
+            color: #3b82f6;
+            text-decoration: none;
+            font-size: 0.875rem;
+            padding: 0.25rem 0;
+        }
+        .source-link:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${escapeHTML(threadTitle)}</h1>
+            <div class="metadata">
+                Exported on ${new Date().toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+            </div>
+        </div>
+
+        ${thread.messages.map((msg: { role: string; content: string; sources?: Array<{ url: string; title: string }> }) => `
+        <div class="message">
+            <div class="message-header">
+                <div class="avatar avatar-${msg.role}">
+                    ${msg.role === 'user' ? 'U' : 'AI'}
+                </div>
+                <div class="role">${msg.role === 'user' ? 'You' : 'Assistant'}</div>
+            </div>
+            <div class="content">${msg.content}</div>
+            ${msg.sources && msg.sources.length > 0 ? `
+            <div class="sources">
+                <div class="sources-title">Sources:</div>
+                ${msg.sources.map((src: { url: string; title: string }) => `
+                    <a href="${escapeHTML(src.url)}" class="source-link" target="_blank" rel="noopener">
+                        ${escapeHTML(src.title)}
+                    </a>
+                `).join('')}
+            </div>
+            ` : ''}
+        </div>
+        `).join('')}
+
+        <div class="footer">
+            Generated by Gemixity - AI-Powered Search
+        </div>
+    </div>
+</body>
+</html>`;
+
+    // Create and download file
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${sanitizeFilename(threadTitle)}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    return true;
+  } catch (error) {
+    console.error('Export error:', error);
+    return false;
+  }
+}
+
+/**
+ * Generate a shareable link for a thread
+ */
+export async function shareThread(threadId: string): Promise<string | null> {
+  try {
+    // Generate share ID on backend
+    const response = await fetch(`/api/threads/${threadId}/share`, {
+      method: 'POST',
+    });
+
+    if (!response.ok) throw new Error('Failed to create share link');
+    const data = await response.json();
+
+    // Return the share URL
+    const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
+    return shareUrl;
+  } catch (error) {
+    console.error('Share error:', error);
+    return null;
+  }
+}
+
+/**
+ * Helper function to escape HTML
+ */
+function escapeHTML(str: string): string {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
+ * Helper function to sanitize filename
+ */
+function sanitizeFilename(filename: string): string {
+  return filename
+    .replace(/[^a-z0-9_\-]/gi, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 100);
+}

@@ -1,0 +1,28 @@
+# Core Framework
+fastapi==0.118.0
+uvicorn==0.37.0
+pydantic==2.11.9
+
+# Google AI
+google-genai==1.38.0
+
+# Database
+sqlalchemy==2.0.36
+psycopg2==2.9.10
+
+# Session Storage
+redis==5.2.1
+
+# Rate Limiting
+slowapi==0.1.9
+
+# Utilities
+python-dotenv==1.0.1
+markdown==3.9
+requests==2.32.3
+beautifulsoup4==4.13.1
+
+# ASGI Server
+httptools==0.6.4
+uvloop==0.21.0
+watchfiles==1.1.0
