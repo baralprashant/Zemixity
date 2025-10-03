@@ -3,17 +3,14 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { SearchInput } from '@/components/SearchInput';
 import { SearchResults } from '@/components/SearchResults';
 import { FollowUpInput } from '@/components/FollowUpInput';
 import { RelatedQuestions } from '@/components/RelatedQuestions';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Loader2 } from 'lucide-react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
 function SearchContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -126,22 +123,6 @@ function SearchContent() {
       });
     },
   });
-
-  const handleSearch = async (newQuery: string) => {
-    if (newQuery === searchQuery) {
-      setRefetchCounter(c => c + 1);
-    } else {
-      // Top search bar always starts NEW conversation
-      setSessionId(null);
-      setThreadId(null);
-      setCurrentResults(null);  // Clear old results immediately
-      setOriginalQuery(null);
-      setIsFollowUp(false);
-      setSearchQuery(newQuery);
-      setAllSources([]);  // Clear sources for new conversation
-    }
-    router.push(`/search?q=${encodeURIComponent(newQuery)}`, { scroll: false });
-  };
 
   const handleFollowUp = async (newFollowUpQuery: string) => {
     setFollowUpQuery(newFollowUpQuery);
