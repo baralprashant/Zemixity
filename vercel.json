@@ -5,12 +5,6 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "env": {
-    "NEXT_PUBLIC_API_URL": {
-      "description": "Backend API URL",
-      "value": "https://your-backend-url.com"
-    }
-  },
   "headers": [
     {
       "source": "/(.*)",
@@ -41,7 +35,7 @@
   "redirects": [
     {
       "source": "/api/:path*",
-      "destination": "https://your-backend-url.com/api/:path*",
+      "destination": "https://zemixity.up.railway.app/api/:path*",
       "permanent": false
     }
   ]
