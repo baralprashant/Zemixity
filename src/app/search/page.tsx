@@ -1,186 +1,140 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SearchResults } from '@/components/SearchResults';
 import { FollowUpInput } from '@/components/FollowUpInput';
 import { RelatedQuestions } from '@/components/RelatedQuestions';
 import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { useStreamingSearch } from '@/hooks/useStreamingSearch';
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [currentResults, setCurrentResults] = useState<{
-    sessionId?: string;
-    threadId?: string;
-    summary: string;
-    sources: Array<{ title: string; url: string; snippet: string }>;
-    relatedQuestions?: string[];
-    conversation?: Array<{
-      id: string;
-      role: string;
-      content: string;
-      sources: Array<{ title: string; url: string; snippet: string }>;
-      created_at: string;
-    }>;
-  } | null>(null);
-  const [originalQuery, setOriginalQuery] = useState<string | null>(null);
-  const [isFollowUp, setIsFollowUp] = useState(false);
-  const [followUpQuery, setFollowUpQuery] = useState<string | null>(null);
+  const {
+    search,
+    followUp,
+    loadThread,
+    content,
+    sources,
+    relatedQuestions,
+    status,
+    isLoading,
+    error,
+    reset,
+    conversation,
+    currentQuery
+  } = useStreamingSearch();
 
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
-  const [refetchCounter, setRefetchCounter] = useState(0);
-  const [allSources, setAllSources] = useState<Array<{ title: string; url: string; snippet: string }>>([]);
+  // Perform search when query param changes or load thread history
+  useEffect(() => {
+    const query = searchParams.get('q');
+    const threadId = searchParams.get('threadId');
+    const hasFile = searchParams.get('hasFile');
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['search', searchQuery, refetchCounter],
-    queryFn: async () => {
-      if (!searchQuery) return null;
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!response.ok) throw new Error('Search failed');
-      const result = await response.json();
-      if (result.sessionId) {
-        setSessionId(result.sessionId);
-        setThreadId(result.threadId || null);
-        setCurrentResults(result);
-        if (!originalQuery) {
-          setOriginalQuery(searchQuery);
+    // If threadId is provided, load the conversation history
+    if (threadId) {
+      // Load thread conversation from API
+      fetch(`/api/threads/${threadId}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Failed to load thread');
+          return res.json();
+        })
+        .then(thread => {
+          // Thread data contains: id, session_id, messages[]
+          // Load the conversation into the streaming hook without triggering new search
+          reset(); // Clear any previous state
+          loadThread({
+            id: thread.id,
+            session_id: thread.session_id,
+            messages: thread.messages
+          });
+        })
+        .catch(error => {
+          console.error('Error loading thread:', error);
+          toast({
+            variant: "destructive",
+            title: "Failed to load conversation",
+            description: "Please try again",
+          });
+        });
+      return;
+    }
+
+    // Normal search flow
+    if (query) {
+      reset(); // Clear previous results
+
+      // Check if there's a file upload
+      if (hasFile === 'true') {
+        const fileData = sessionStorage.getItem('uploadedFileData');
+        const fileInfo = sessionStorage.getItem('uploadedFile');
+
+        if (fileData && fileInfo) {
+          // Convert data URL back to File
+          const info = JSON.parse(fileInfo);
+          fetch(fileData)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], info.name, { type: info.type });
+              search(query, file);
+
+              // Clean up sessionStorage
+              sessionStorage.removeItem('uploadedFileData');
+              sessionStorage.removeItem('uploadedFile');
+            });
+        } else {
+          search(query);
         }
-        setIsFollowUp(false);
-
-        // Accumulate sources from all messages in conversation
-        if (result.conversation && result.conversation.length > 0) {
-          const newSources = result.conversation.flatMap((msg: { sources?: unknown[] }) => msg.sources || []);
-          setAllSources(newSources);
-        } else if (result.sources) {
-          setAllSources(result.sources);
-        }
+      } else {
+        search(query);
       }
-      return result;
-    },
-    enabled: !!searchQuery,
-  });
+    }
+  }, [searchParams, search, reset, loadThread, toast]);
 
-  const followUpMutation = useMutation({
-    mutationFn: async (followUpQuery: string) => {
-      if (!sessionId) {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(followUpQuery)}`);
-        if (!response.ok) throw new Error('Search failed');
-        const result = await response.json();
-        if (result.sessionId) {
-          setSessionId(result.sessionId);
-          setOriginalQuery(searchQuery);
-          setIsFollowUp(false);
-        }
-        return result;
-      }
-
-      const response = await fetch('/api/follow-up', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, threadId, query: followUpQuery }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          const newResponse = await fetch(`/api/search?q=${encodeURIComponent(followUpQuery)}`);
-          if (!newResponse.ok) throw new Error('Search failed');
-          const result = await newResponse.json();
-          if (result.sessionId) {
-            setSessionId(result.sessionId);
-            setOriginalQuery(searchQuery);
-            setIsFollowUp(false);
-          }
-          return result;
-        }
-        throw new Error('Follow-up failed');
-      }
-
-      return await response.json();
-    },
-    onSuccess: (result) => {
-      setCurrentResults(result);
-      setIsFollowUp(true);
-
-      // Accumulate sources from all messages in conversation (don't replace, add to existing)
-      if (result.conversation && result.conversation.length > 0) {
-        const newSources = result.conversation.flatMap((msg: { sources?: unknown[] }) => msg.sources || []);
-        setAllSources(newSources);
-      } else if (result.sources) {
-        setAllSources(prev => [...prev, ...result.sources]);
-      }
-    },
-    onError: (error: Error) => {
+  // Show error toast if search fails
+  useEffect(() => {
+    if (error) {
       toast({
         variant: "destructive",
-        title: "Follow-up failed",
-        description: error.message || "An error occurred while processing your follow-up question.",
+        title: "Search failed",
+        description: error,
       });
-    },
-  });
-
-  const handleFollowUp = async (newFollowUpQuery: string) => {
-    setFollowUpQuery(newFollowUpQuery);
-    await followUpMutation.mutateAsync(newFollowUpQuery);
-  };
-
-  const handleRetry = () => {
-    if (isFollowUp && followUpQuery) {
-      followUpMutation.mutate(followUpQuery);
-    } else {
-      setRefetchCounter(c => c + 1);
     }
+  }, [error, toast]);
+
+  const handleFollowUp = async (query: string) => {
+    await followUp(query);
   };
-
-  useEffect(() => {
-    const query = searchParams.get('q') || '';
-    if (query && query !== searchQuery) {
-      // Clear all state when URL changes
-      setSessionId(null);
-      setThreadId(null);
-      setCurrentResults(null);  // Clear old results
-      setOriginalQuery(null);
-      setIsFollowUp(false);
-      setSearchQuery(query);
-      setAllSources([]);  // Clear sources for new conversation
-    }
-  }, [searchParams, searchQuery]);
-
-  const displayResults = currentResults || data;
 
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Scrollable Results Area - Two Column Layout */}
+        {/* Scrollable Results Area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex gap-6 justify-center">
-              {/* Main Content Area (Center) */}
-              <div className="space-y-6 max-w-3xl w-full">
+              {/* Main Content Area */}
+              <div className="space-y-6 max-w-5xl w-full">
                 {/* Results */}
                 <SearchResults
-                  results={displayResults}
-                  isLoading={isLoading || followUpMutation.isPending}
-                  error={error || followUpMutation.error || undefined}
-                  isFollowUp={isFollowUp}
-                  originalQuery={originalQuery || ''}
-                  onRetry={handleRetry}
-                  allSources={allSources}
+                  content={content}
+                  sources={sources}
+                  status={status}
+                  isLoading={isLoading}
+                  error={error}
+                  conversation={conversation}
+                  currentQuery={currentQuery}
                 />
 
                 {/* Related Questions */}
-                {displayResults && displayResults.relatedQuestions && !isLoading && !followUpMutation.isPending && (
+                {relatedQuestions && relatedQuestions.length > 0 && !isLoading && (
                   <RelatedQuestions
-                    questions={displayResults.relatedQuestions}
-                    onQuestionClick={(question) => {
-                      handleFollowUp(question);
-                    }}
-                    isLoading={isLoading || followUpMutation.isPending}
+                    questions={relatedQuestions}
+                    onQuestionClick={handleFollowUp}
+                    isLoading={isLoading}
                   />
                 )}
 
@@ -192,12 +146,12 @@ function SearchContent() {
         </div>
 
         {/* Sticky Follow-up Input */}
-        {displayResults && !isLoading && !followUpMutation.isPending && (
+        {content && !isLoading && (
           <div className="flex-none border-t border-gray-200 bg-white/95 backdrop-blur-sm sticky bottom-0 z-10">
-            <div className="max-w-3xl mx-auto px-4 py-4">
+            <div className="max-w-5xl mx-auto px-4 py-4">
               <FollowUpInput
                 onSubmit={handleFollowUp}
-                isLoading={followUpMutation.isPending}
+                isLoading={isLoading}
               />
             </div>
           </div>

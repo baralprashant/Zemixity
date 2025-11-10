@@ -25,7 +25,9 @@ class Analytics {
    */
   track(event: string, properties?: Record<string, unknown>) {
     if (!this.enabled) {
-      console.log('[Analytics - Dev]', event, properties);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Analytics - Dev]', event, properties);
+      }
       return;
     }
 
@@ -92,15 +94,17 @@ class Analytics {
   /**
    * Send event to analytics service
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private sendEvent(_event: AnalyticsEvent) {
     // Example: Send to your backend analytics endpoint
     if (typeof window !== 'undefined') {
-      // Uncomment and configure your analytics service
+      // Uncomment and configure your analytics service when ready
+      // The event parameter is intentionally prefixed with _ to indicate it's for future use
       /*
       fetch('/api/analytics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(event),
+        body: JSON.stringify(_event),
       }).catch(err => console.error('Analytics error:', err));
       */
 

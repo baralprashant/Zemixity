@@ -104,7 +104,14 @@ export function PersistentSidebar({
 
       setThreadToDelete(null);
     } catch (error) {
-      console.error('Error deleting thread:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error deleting thread:', error);
+      }
+      toast({
+        variant: "destructive",
+        title: "Failed to delete thread",
+        description: "Please try again later.",
+      });
     }
   };
 
@@ -133,7 +140,14 @@ export function PersistentSidebar({
 
       setThreadToRename(null);
     } catch (error) {
-      console.error('Error renaming thread:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error renaming thread:', error);
+      }
+      toast({
+        variant: "destructive",
+        title: "Failed to rename thread",
+        description: "Please try again later.",
+      });
     }
   };
 

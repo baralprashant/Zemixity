@@ -17,29 +17,12 @@ export function LayoutWithSidebar({ children }: { children: React.ReactNode }) {
   useKeyboardShortcuts({});
 
   const handleThreadSelect = useCallback(async (selectedThreadId: string) => {
-    try {
-      const response = await fetch(`/api/threads/${selectedThreadId}`);
-      if (!response.ok) throw new Error('Failed to load thread');
-      const thread = await response.json();
+    setCurrentThreadId(selectedThreadId);
 
-      setCurrentThreadId(thread.id);
-
-      // Find the first user message to set as search query
-      const firstUserMessage = thread.messages.find((m: { role: string; content: string }) => m.role === 'user');
-
-      if (firstUserMessage) {
-        // Navigate to search page with the query
-        router.push(`/search?q=${encodeURIComponent(firstUserMessage.content)}`);
-      }
-    } catch (error) {
-      console.error('Error loading thread:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load conversation',
-        variant: 'destructive',
-      });
-    }
-  }, [router, toast]);
+    // Navigate to search page with threadId to load full conversation history
+    // This will load all messages and allow continuing the conversation
+    router.push(`/search?threadId=${selectedThreadId}`);
+  }, [router]);
 
   const handleThreadDelete = useCallback((deletedThreadId: string) => {
     // If we're viewing the deleted thread, clear state and go home

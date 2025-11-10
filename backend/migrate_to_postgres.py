@@ -11,13 +11,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Source (SQLite)
-SQLITE_URL = "sqlite:///./gemixity.db"
+SQLITE_URL = "sqlite:///./zemixity.db"
 
 # Target (PostgreSQL from .env)
 POSTGRES_URL = os.getenv("DATABASE_URL")
 
 if not POSTGRES_URL or "sqlite" in POSTGRES_URL:
-    print("❌ Please set DATABASE_URL to your PostgreSQL connection string in .env")
+    print(" Please set DATABASE_URL to your PostgreSQL connection string in .env")
     exit(1)
 
 def migrate():
@@ -58,7 +58,7 @@ def migrate():
                 ))
 
         postgres_session.commit()
-        print("✅ Threads migrated")
+        print(" Threads migrated")
 
         # Migrate Messages
         messages = sqlite_session.query(Message).all()
@@ -78,14 +78,14 @@ def migrate():
                 ))
 
         postgres_session.commit()
-        print("✅ Messages migrated")
+        print(" Messages migrated")
 
         print("\n🎉 Migration completed successfully!")
         print(f"   Threads: {len(threads)}")
         print(f"   Messages: {len(messages)}")
 
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        print(f" Migration failed: {e}")
         postgres_session.rollback()
         raise
     finally:

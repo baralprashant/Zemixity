@@ -1,7 +1,8 @@
 # Core Framework
 fastapi==0.118.0
-uvicorn==0.37.0
+uvicorn[standard]
 pydantic==2.11.9
+python-multipart
 
 # Google AI
 google-genai==1.38.0
@@ -19,10 +20,6 @@ slowapi==0.1.9
 # Utilities
 python-dotenv==1.0.1
 markdown==3.9
-requests==2.32.3
-beautifulsoup4==4.13.1
-
-# ASGI Server
-httptools==0.6.4
-uvloop==0.21.0
-watchfiles==1.1.0
+requests>=2.32.3
+beautifulsoup4==4.12.3
+python-magic==0.4.27

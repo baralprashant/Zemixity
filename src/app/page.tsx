@@ -7,8 +7,25 @@ import { SearchInput } from '@/components/SearchInput';
 export default function Home() {
   const router = useRouter();
 
-  const handleSearch = (query: string) => {
-    router.push(`/search?q=${encodeURIComponent(query)}`);
+  const handleSearch = (query: string, file?: File) => {
+    if (file) {
+      // For file uploads, store in sessionStorage and navigate
+      // The search page will pick it up
+      sessionStorage.setItem('uploadedFile', JSON.stringify({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      }));
+      // Store actual file (will be retrieved in search page)
+      const reader = new FileReader();
+      reader.onload = () => {
+        sessionStorage.setItem('uploadedFileData', reader.result as string);
+        router.push(`/search?q=${encodeURIComponent(query)}&hasFile=true`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+    }
   };
 
   return (
