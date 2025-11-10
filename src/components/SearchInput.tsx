@@ -285,6 +285,11 @@ export function SearchInput({
           )}
         </button>
       </div>
+
+      {/* Disclaimer */}
+      <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+        Zemixity is not always right. Double check your responses.
+      </p>
     </form>
   );
 }
